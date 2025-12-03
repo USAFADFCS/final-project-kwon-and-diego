@@ -1,17 +1,22 @@
-from src.schedule_logic import ScheduleAgent
+from src.agent.weekly_agent import WeeklyAgent
 
 def main():
-    events = [
-        ("Monday", "Study ML", 3),
-        ("Monday", "Gym", 1),
-        ("Tuesday", "Project Work", 4),
-    ]
+    print("WEEKLY AGENT STARTED")
 
-    agent = ScheduleAgent()
-    schedule = agent.generate_schedule(events)
+    agent = WeeklyAgent(min_sleep=8)
 
-    print("\nGenerated Schedule:\n")
-    print(schedule)
+    weekly_events = {
+        "Monday":   [("Gym", 2), ("Work", 8), ("Leisure", 2), ("Sleep", 8)],
+        "Tuesday":  [("Gym", 2), ("Project Trip", 3), ("Work", 8), ("Sleep", 8)],
+        "Wednesday":[("Gym", 2), ("Work", 8), ("Leisure", 2), ("Sleep", 8)],
+        "Thursday": [("Work", 8), ("Leisure", 2), ("Sleep", 8)],
+        "Friday":   [("Work", 8), ("Gym", 2), ("Leisure", 3), ("Sleep", 8)],
+        "Saturday": [("Work", 8), ("Gym", 2), ("Leisure", 3), ("Sleep", 8)],
+        "Sunday":   [("Work", 8), ("Gym", 2), ("Leisure", 3), ("Sleep", 8)]
+    }
+
+    agent.set_user_weekly_events(weekly_events)
+    agent.run_weekly_cycle()
 
 if __name__ == "__main__":
     main()
