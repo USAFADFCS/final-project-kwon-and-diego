@@ -2,7 +2,7 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+MODEL_NAME = "microsoft/Phi-3.5-mini-instruct"
 
 # Load tokenizer & model ONCE globally
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)

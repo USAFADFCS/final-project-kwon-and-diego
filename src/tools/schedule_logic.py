@@ -69,28 +69,70 @@ class ScheduleAgent:
         )
 
         prompt = f"""
-Create a schedule with sleep.
 
-Minimum sleep: {self.sleep_tracker.minimum_hours} hours.
+You must generate a weekly schedule from Monday to Sunday.
 
-Events:
-{event_text}
-
-Sleep logs:
-{sleep_info or "None"}
-
-Output ONLY in this layout:
+Follow these rules:
+- Output MUST be ONLY the schedule.
+- NO explanations, NO comments, NO extra text.
+- NO bullet points, NO paragraphs.
+- Use EXACTLY this format:
 
 Monday:
-- Sleep: X hours
-- Task: <task>
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
 
 Tuesday:
-- Sleep: X hours
-- Task: <task>
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
 
-No explanations.
+Wednesday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Thursday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Friday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Saturday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Sunday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Data you must use:
+
+Minimum Sleep: {self.sleep_tracker.minimum_hours} hours
+
+User Events:
+{event_text}
+
+Sleep Logs:
+{sleep_info or "None"}
+
+Rules:
+- Times must be 24-hour format (HH:MM).
+- Activities must be short words (sleep, work, gym, study, meeting, leisure).
+- You MUST include sleep each day meeting the minimum sleep hours.
+- Do NOT output anything outside the required format.
+- Do NOT repeat events unless necessary.
+- Start generating the schedule now.
 """
+
+
 
 
 

@@ -86,12 +86,39 @@ Events:
 Respond ONLY in this format:
 
 Monday:
-- Sleep: X hours
-- Task: <task> (Y hours)
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
 
 Tuesday:
-- Sleep: X hours
-- Task: <task> (Y hours)
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Wednesday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Thursday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Friday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Saturday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+
+Sunday:
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
+    HH:MM-HH:MM-activity
 
 No explanations.
 """
