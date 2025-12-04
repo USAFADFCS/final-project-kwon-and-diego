@@ -1,17 +1,12 @@
-from scipy.optimize import linprog
+# src/tools/optimizer.py
 
-def optimize_daily_hours(tasks, sleep_min=8):
+def optimize_schedule(parsed_schedule):
     """
-    tasks = [("Gym", 2), ("Work", 8), ("Leisure", 2)]
+    Placeholder hook for SciPy or linear optimization.
+    You can add:
+        - minimize total task overlap
+        - maximize leisure time
+        - minimize late-night work
+        - enforce sleep windows
     """
-    # Objective: minimize idle time
-    c = [1] * len(tasks)
-
-    # Constraint: sum(task hours) + sleep ≥ 24
-    A_eq = [ [1]*len(tasks) ]
-    b_eq = [24 - sleep_min]
-
-    result = linprog(c, A_eq=A_eq, b_eq=b_eq, bounds=[(hours, hours+4) for _, hours in tasks])
-
-    # Output optimized hours for each task
-    return result.x
+    return parsed_schedule

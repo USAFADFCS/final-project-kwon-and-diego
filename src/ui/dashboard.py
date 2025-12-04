@@ -1,19 +1,33 @@
+# src/ui/dashboard.py
 import streamlit as st
+from src.agent.weekly_agent import WeeklyAgent
 
-def run_dashboard(agent):
-    st.title("Weekly AI Schedule")
-    st.write("Your AI-generated weekly schedule:")
+def main():
+    st.title("Weekly AI Schedule (Local Model)")
 
-    schedule = agent.weekly_schedule
+    if st.button("Generate Weekly Schedule"):
+        agent = WeeklyAgent(min_sleep=8)
 
-    for day, tasks in schedule.items():
-        st.subheader(day)
-        for task, hours in tasks:
-            st.write(f"- {task}: {hours} hours")
+        weekly_events = {
+            "Monday": [("Gym", 2), ("Work", 8), ("Leisure", 2)],
+            "Tuesday": [("Gym", 2), ("Project Trip", 3), ("Work", 8)],
+            "Wednesday": [("Gym", 2), ("Work", 8), ("Leisure", 2)],
+            "Thursday": [("Work", 8), ("Leisure", 2)],
+            "Friday": [("Work", 8), ("Gym", 2), ("Leisure", 3)],
+            "Saturday": [("Work", 8), ("Gym", 2), ("Leisure", 3)],
+            "Sunday": [("Work", 8), ("Gym", 2), ("Leisure", 3)],
+        }
 
-    if st.button("Regenerate Week"):
-        agent.regenerate()
-        st.experimental_rerun()
+        agent.set_user_weekly_events(weekly_events)
+        schedule = agent.run_weekly_cycle()
 
-    if st.button("Sync to Google Calendar"):
-        agent.sync()
+        st.subheader("Generated Schedule")
+        for day, entries in schedule.items():
+            st.markdown(f"### {day}")
+            if not entries:
+                st.write("_No schedule parsed_")
+            for e in entries:
+                st.write(f"- {e}")
+
+if __name__ == "__main__":
+    main()

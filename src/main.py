@@ -6,13 +6,13 @@ def main():
     agent = WeeklyAgent(min_sleep=8)
 
     weekly_events = {
-        "Monday":   [("Gym", 2), ("Work", 8), ("Leisure", 2), ("Sleep", 8)],
-        "Tuesday":  [("Gym", 2), ("Project Trip", 3), ("Work", 8), ("Sleep", 8)],
-        "Wednesday":[("Gym", 2), ("Work", 8), ("Leisure", 2), ("Sleep", 8)],
-        "Thursday": [("Work", 8), ("Leisure", 2), ("Sleep", 8)],
-        "Friday":   [("Work", 8), ("Gym", 2), ("Leisure", 3), ("Sleep", 8)],
-        "Saturday": [("Work", 8), ("Gym", 2), ("Leisure", 3), ("Sleep", 8)],
-        "Sunday":   [("Work", 8), ("Gym", 2), ("Leisure", 3), ("Sleep", 8)]
+        "Monday":   [("Gym", 2), ("Work", 8), ("Leisure", 2)],
+        "Tuesday":  [("Gym", 2), ("Project Trip", 3), ("Work", 8)],
+        "Wednesday":[("Gym", 2), ("Work", 8), ("Leisure", 2)],
+        "Thursday": [("Work", 8), ("Leisure", 2)],
+        "Friday":   [("Work", 8), ("Gym", 2), ("Leisure", 3)],
+        "Saturday": [("Work", 8), ("Gym", 2), ("Leisure", 3)],
+        "Sunday":   [("Work", 8), ("Gym", 2), ("Leisure", 3)],
     }
 
     agent.set_user_weekly_events(weekly_events)
