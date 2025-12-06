@@ -1,22 +1,29 @@
+# src/main.py
+
 from src.agent.weekly_agent import WeeklyAgent
 
+
 def main():
-    print("WEEKLY AGENT STARTED")
+    print("WEEKLY AGENT (CLI TEST)")
 
-    agent = WeeklyAgent(min_sleep=8)
+    # Simple built-in events if you run from CLI
+    events_text = """Monday 08:00-10:00 Gym
+Monday 10:00-18:00 Work
+Monday 18:00-20:00 Leisure
+Tuesday 08:00-10:00 Gym
+Tuesday 10:00-13:00 Project Trip
+Tuesday 13:00-21:00 Work"""
 
-    weekly_events = {
-        "Monday":   [("Gym", 2), ("Work", 8), ("Leisure", 2)],
-        "Tuesday":  [("Gym", 2), ("Project Trip", 3), ("Work", 8)],
-        "Wednesday":[("Gym", 2), ("Work", 8), ("Leisure", 2)],
-        "Thursday": [("Work", 8), ("Leisure", 2)],
-        "Friday":   [("Work", 8), ("Gym", 2), ("Leisure", 3)],
-        "Saturday": [("Work", 8), ("Gym", 2), ("Leisure", 3)],
-        "Sunday":   [("Work", 8), ("Gym", 2), ("Leisure", 3)],
-    }
+    agent = WeeklyAgent(min_sleep=8, debug=True)
+    agent.set_user_input_events(events_text)
+    schedule = agent.run_weekly_cycle()
 
-    agent.set_user_weekly_events(weekly_events)
-    agent.run_weekly_cycle()
+    print("\nFINAL WEEKLY SCHEDULE:")
+    for day, entries in schedule.items():
+        print(day + ":")
+        for e in entries:
+            print("  " + e)
+
 
 if __name__ == "__main__":
     main()
