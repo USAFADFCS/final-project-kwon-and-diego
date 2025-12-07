@@ -1,6 +1,7 @@
 # src/main.py
 
 from src.agent.weekly_agent import WeeklyAgent
+from src.tools.evaluator import evaluate_schedule
 
 
 def main():
@@ -23,6 +24,11 @@ Tuesday 13:00-21:00 Work"""
         print(day + ":")
         for e in entries:
             print("  " + e)
+
+    results = evaluate_schedule(schedule_text, weekly_events, min_sleep=8)
+    print("\n=== METRICS REPORT ===")
+    for metric, outcome in results.items():
+        print(metric.upper(), ":", outcome)
 
 
 if __name__ == "__main__":

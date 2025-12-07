@@ -1,296 +1,211 @@
-# src/agent/weekly_agent.py
-
 import re
-from datetime import datetime, timedelta
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
-from src.agent.tinyllama import call_tinyllama
-from src.tools.event_parser import parse_user_events
+DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
-DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+# --------------------------------------------------------------------
+# Helper formatting functions
+# --------------------------------------------------------------------
+def normalize_day(day: str):
+    d = day.strip().rstrip(":").lower()
+    for real_day in DAYS:
+        if real_day.lower() == d:
+            return real_day
+    return None
+
+def parse_timeblock(line):
+    """
+    Example line:
+    07:00-09:00-Work
+    """
+    match = re.match(r"\s*(\d\d:\d\d)-(\d\d:\d\d)-(.+)", line)
+    if not match:
+        return None
+    start, end, act = match.groups()
+    return start, end, act.strip()
 
 
+# --------------------------------------------------------------------
+# WeeklyAgent Class
+# --------------------------------------------------------------------
 class WeeklyAgent:
-    def __init__(self, min_sleep: int = 8, debug: bool = False):
-        """
-        Phi-3.5-optimized weekly scheduling agent.
-
-        min_sleep : minimum hours of sleep per day
-        debug     : if True, prints extra logs; also a good flag for Streamlit mode.
-        """
+    def __init__(self, min_sleep=8):
         self.min_sleep = min_sleep
-        self.debug = debug
-        self.user_weekly_events: dict[str, list[tuple[str, float]]] = {}
-        self.last_raw_output: str | None = None
-        self.last_clean_output: str | None = None
+        self.user_weekly_events = {day: [] for day in DAYS}
 
-        if self.debug:
-            print("AGENT CREATED (Phi-3.5, debug mode ON)")
-
-    # ------------------------------------------------------------------
-    # Debug logger
-    # ------------------------------------------------------------------
-    def log(self, *args):
-        if self.debug:
-            print(*args)
-
-    # ------------------------------------------------------------------
-    # Accept events as structured dict
-    # ------------------------------------------------------------------
-    def set_user_weekly_events(self, weekly_events: dict):
-        """
-        weekly_events format:
-            {
-                "Monday": [("Gym", 2.0), ("Work", 8.0), ...],
-                ...
-            }
-        """
-        self.user_weekly_events = weekly_events
-
-    # ------------------------------------------------------------------
-    # Accept raw text input (from Streamlit text_area)
-    # ------------------------------------------------------------------
-    def set_user_input_events(self, text: str):
-        parsed = parse_user_events(text)
-        self.user_weekly_events = parsed
-        self.log("Parsed user events:", parsed)
-
-    # ------------------------------------------------------------------
-    # Prompt builder
-    # ------------------------------------------------------------------
-    def _build_prompt(self) -> str:
-        if not self.user_weekly_events:
-            # fallback example if nothing provided
-            fallback = {
-                "Monday": [("Gym", 2), ("Work", 8), ("Leisure", 2)],
-                "Tuesday": [("Gym", 2), ("Project Trip", 3), ("Work", 8)],
-            }
-            events_dict = fallback
-        else:
-            events_dict = self.user_weekly_events
-
-        event_text = "\n".join(
-            f"{day}: " + ", ".join(f"{task} ({hours:.1f} hrs)" for task, hours in tasks)
-            for day, tasks in events_dict.items()
+        # --------------------------
+        # Phi-3.5 Mini Instruct model
+        # --------------------------
+        print("Loading Phi-3.5 Mini Instruct...")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "microsoft/Phi-3.5-mini-instruct"
         )
+        self.model = AutoModelForCausalLM.from_pretrained(
+            "microsoft/Phi-3.5-mini-instruct",
+            torch_dtype=torch.float32,
+            device_map="cpu"
+        )
+        print("Loaded successfully.")
 
-        prompt = f"""
-You are an AI scheduling engine.
+    # ----------------------------------------------------------
+    # Accept user events from StreamLit or main app
+    # ----------------------------------------------------------
+    def set_user_weekly_events(self, events: dict):
+        """Events format: {"Monday":[("Work",8),("Gym",2)], ... }"""
+        self.user_weekly_events = events
 
-Your task is to generate a 7-day weekly schedule using the EXACT format below.
+    # ----------------------------------------------------------
+    # Build prompt that Phi can actually understand
+    # ----------------------------------------------------------
+    def build_prompt(self):
+        event_lines = []
+        for day, tasks in self.user_weekly_events.items():
+            formatted = ", ".join(f"{name} ({hours} hrs)" for name, hours in tasks)
+            if formatted == "":
+                formatted = "None"
+            event_lines.append(f"{day}: {formatted}")
 
-REQUIREMENTS:
-- Output MUST contain all 7 days in this exact order:
-  Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.
-- Every day must include at least {self.min_sleep} hours of Sleep.
-- Sleep must ALWAYS be the final block of each day.
-- Sleep may cross midnight (e.g., 21:00-05:00-Sleep is allowed).
-- If sleep crosses midnight, record it under the day where the sleep begins.
-- Activities must remain on their correct day.
-- A day should be close to 24 total hours (it is okay if slightly under or over).
-- NO explanations. NO examples. NO commentary.
+        event_text = "\n".join(event_lines)
 
-OUTPUT FORMAT (USE THIS EXACTLY):
+        PROMPT = f"""
+You are an AI weekly scheduling assistant.
+
+You MUST build a valid weekly schedule using ALL tasks listed below.
+Any schedule missing tasks is INVALID.
+
+RULES:
+- Every listed task MUST appear on the correct day.
+- Sleep must appear once and only once per day.
+- Sleep may span midnight (example: 21:00-05:00).
+- Total hours per day must NOT exceed 24.
+- Format MUST match EXACTLY:
 
 Monday:
     HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
-
 Tuesday:
     HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
-
-Wednesday:
-    HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
-
-Thursday:
-    HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
-
-Friday:
-    HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
-
-Saturday:
-    HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
-
+...
 Sunday:
     HH:MM-HH:MM-Activity
-    HH:MM-HH:MM-Activity
 
-EVENT INPUT:
+WEEKLY TASKS:
 {event_text}
 
-Now output ONLY the weekly schedule in the exact format above.
+Now generate the schedule.
 """
-        return prompt
+        return PROMPT
 
-    # ------------------------------------------------------------------
-    # Clean model output: keep only day headers + valid time lines
-    # ------------------------------------------------------------------
-    def _clean_model_output(self, text: str) -> str:
-        cleaned_lines: list[str] = []
-        day_headers = {f"{d}:" for d in DAYS}
+    # ----------------------------------------------------------
+    # Clean the model output before parsing
+    # ----------------------------------------------------------
+    def clean_output(self, text: str):
+        """
+        Removes:
+        - code fences
+        - '[Answer]:' artifacts
+        - Explanations
+        - Duplicate intro text from model
+        """
+        # Remove code fences
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+
+        # Remove [Answer]: artifacts
+        text = text.replace("[Answer]:", "")
+
+        # Remove any trailing explanation sections by cutting after last valid day
+        last_day_pos = 0
+        for day in DAYS:
+            pos = text.lower().rfind(day.lower() + ":")
+            if pos > last_day_pos:
+                last_day_pos = pos
+
+        text = text[last_day_pos:]  # keep only real schedule portion
+
+        return text.strip()
+
+    # ----------------------------------------------------------
+    # Parse cleaned text into structured schedule
+    # ----------------------------------------------------------
+    def parse_schedule(self, text: str):
+        schedule = {day: [] for day in DAYS}
+
+        current_day = None
 
         for line in text.splitlines():
-            stripped = line.strip()
-            if not stripped:
+            line = line.strip()
+
+            # Identify day headers
+            if line.rstrip(":") in DAYS or normalize_day(line):
+                current_day = normalize_day(line)
                 continue
 
-            if stripped in day_headers:
-                cleaned_lines.append(stripped)
+            if not current_day:
                 continue
 
-            # e.g., "08:00-10:00-Gym"
-            if re.match(r"^\d{1,2}:\d{2}-\d{1,2}:\d{2}-", stripped):
-                cleaned_lines.append(stripped)
-                continue
-
-        return "\n".join(cleaned_lines)
-
-    # ------------------------------------------------------------------
-    # Parse cleaned schedule into dict[day] -> [ "HH:MM-HH:MM-Activity", ... ]
-    # ------------------------------------------------------------------
-    def _parse_schedule(self, cleaned_text: str) -> dict:
-        schedule = {day: [] for day in DAYS}
-        current_day: str | None = None
-
-        for line in cleaned_text.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            if stripped in [f"{d}:" for d in DAYS]:
-                current_day = stripped[:-1]
-                continue
-
-            if re.match(r"^\d{1,2}:\d{2}-\d{1,2}:\d{2}-", stripped) and current_day:
-                schedule[current_day].append(stripped)
+            # Parse time blocks
+            tb = parse_timeblock(line)
+            if tb:
+                schedule[current_day].append(tb)
 
         return schedule
 
-    # ------------------------------------------------------------------
-    # Ensure Sleep is last each day
-    # ------------------------------------------------------------------
-    def _force_sleep_last(self, schedule: dict) -> dict:
-        fixed = {}
-        for day, entries in schedule.items():
-            non_sleep = []
-            sleep_blocks = []
-            for e in entries:
-                if "-Sleep" in e:
-                    sleep_blocks.append(e)
-                else:
-                    non_sleep.append(e)
-            fixed[day] = non_sleep + sleep_blocks
-        return fixed
+    # ----------------------------------------------------------
+    # Enforce that all required tasks exist
+    # ----------------------------------------------------------
+    def enforce_task_preservation(self, parsed_schedule):
+        missing = []
 
-    # ------------------------------------------------------------------
-    # Adjust last Sleep block so day is exactly 24h (if possible)
-    # ------------------------------------------------------------------
-    def _fix_day_to_24_hours(self, entries: list[str]) -> list[str]:
-        """
-        Preserves activity order and individual durations.
-        Only adjusts the final Sleep block so that total = 24 hours.
-        If no Sleep, adds one at the end to fill remaining time.
-        """
-        if not entries:
-            return entries
+        for day, tasks in self.user_weekly_events.items():
+            required = {t[0] for t in tasks}
+            present = {act for (_,_,act) in parsed_schedule[day]}
+            missing_for_day = required - present
+            if missing_for_day:
+                missing.append((day, list(missing_for_day)))
 
-        def parse_time(t: str) -> datetime:
-            return datetime.strptime(t, "%H:%M")
+        return missing
 
-        blocks = []
-        total_hours = 0.0
+    # ----------------------------------------------------------
+    # Run Phi-3.5 and generate text
+    # ----------------------------------------------------------
+    def call_model(self, prompt: str):
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+        output = self.model.generate(
+            **inputs,
+            max_new_tokens=900,
+            temperature=0.4,
+            do_sample=True,
+        )
+        return self.tokenizer.decode(output[0], skip_special_tokens=True)
 
-        for e in entries:
-            t1, t2, act = e.split("-", 2)
-            start = parse_time(t1)
-            end = parse_time(t2)
+    # ----------------------------------------------------------
+    # MAIN PIPELINE
+    # ----------------------------------------------------------
+    def run_weekly_cycle(self):
+        print("Running schedule generation...")
 
-            # Allow crossing midnight
-            if end <= start:
-                end += timedelta(days=1)
+        # Step 1: Build prompt
+        prompt = self.build_prompt()
 
-            dur = (end - start).total_seconds() / 3600.0
-            blocks.append((start, end, act, dur))
-            total_hours += dur
+        # Step 2: Call model
+        raw_output = self.call_model(prompt)
 
-        has_sleep = any("Sleep" in b[2] for b in blocks)
+        print("\nRAW MODEL OUTPUT:")
+        print(raw_output[:5000])  # preview
 
-        # If no sleep exists, add a Sleep block at the end to fill up to 24 hours
-        if not has_sleep:
-            remaining = 24.0 - total_hours
-            if remaining < 0:
-                remaining = 0.0
+        # Step 3: Clean output
+        cleaned = self.clean_output(raw_output)
 
-            last_end = blocks[-1][1]
-            new_end = last_end + timedelta(hours=remaining)
-            blocks.append((last_end, new_end, "Sleep", remaining))
-            return self._blocks_to_strings(blocks)
+        # Step 4: Parse into structure
+        parsed = self.parse_schedule(cleaned)
 
-        # Sleep exists, assumed to be last (we enforce with _force_sleep_last)
-        *non_sleep_blocks, last_block = blocks
-        last_start, last_end, last_act, _ = last_block
+        # Step 5: Validate tasks
+        missing = self.enforce_task_preservation(parsed)
 
-        non_sleep_total = sum(b[3] for b in non_sleep_blocks)
-        new_sleep_duration = 24.0 - non_sleep_total
-        if new_sleep_duration < 0:
-            # Overfull day – clamp sleep to zero rather than go negative
-            new_sleep_duration = 0.0
+        if missing:
+            print("\n❌ Missing tasks detected:", missing)
+        else:
+            print("\n✅ All tasks preserved")
 
-        new_end = last_start + timedelta(hours=new_sleep_duration)
-        fixed_blocks = non_sleep_blocks + [(last_start, new_end, last_act, new_sleep_duration)]
-
-        return self._blocks_to_strings(fixed_blocks)
-
-    def _blocks_to_strings(self, blocks):
-        results = []
-        for start, end, act, _ in blocks:
-            s = start.strftime("%H:%M")
-            e = end.strftime("%H:%M")
-            results.append(f"{s}-{e}-{act}")
-        return results
-
-    # ------------------------------------------------------------------
-    # Main planning pipeline
-    # ------------------------------------------------------------------
-    def plan_week(self) -> dict:
-        prompt = self._build_prompt()
-        raw = call_tinyllama(prompt)
-        self.last_raw_output = raw
-        self.log("\nRAW MODEL OUTPUT:\n", raw)
-
-        cleaned = self._clean_model_output(raw)
-        self.last_clean_output = cleaned
-        self.log("\nCLEANED MODEL OUTPUT:\n", cleaned)
-
-        schedule = self._parse_schedule(cleaned)
-
-        # If totally empty, retry once with a stronger reminder
-        if all(len(v) == 0 for v in schedule.values()):
-            self.log("[WARNING] Empty schedule on first attempt. Retrying...")
-            retry_prompt = prompt + "\nREMINDER: Output ONLY the schedule, no explanations.\n"
-            raw2 = call_tinyllama(retry_prompt)
-            self.last_raw_output = raw2
-            cleaned2 = self._clean_model_output(raw2)
-            self.last_clean_output = cleaned2
-            schedule = self._parse_schedule(cleaned2)
-
-        # Enforce Sleep last
-        schedule = self._force_sleep_last(schedule)
-
-        # Fix each day to exactly 24 hours using Sleep block
-        final_schedule = {
-            day: self._fix_day_to_24_hours(entries)
-            for day, entries in schedule.items()
-        }
-
-        return final_schedule
-
-    # ------------------------------------------------------------------
-    # Public entrypoint
-    # ------------------------------------------------------------------
-    def run_weekly_cycle(self) -> dict:
-        return self.plan_week()
+        # StreamLit needs the *cleaned text*
+        return cleaned
